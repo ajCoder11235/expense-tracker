@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Expense Tracker</title>
     
-    <!-- 1. Include the Chart.js library -->
+    <!-- Link to the Web App Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <!-- 2. CSS for a clean, mobile-first look -->
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -80,7 +81,6 @@
         #expense-list li .item-category { font-weight: bold; }
         #expense-list li .item-amount { font-weight: bold; font-size: 1.1em; color: #d9534f; }
         
-        /* Final style fix for buttons */
         #import-export-controls button, #import-btn-label {
             width: 100%;
             padding: 12px;
@@ -89,7 +89,7 @@
             cursor: pointer;
             border: none;
             margin-bottom: 10px;
-            box-sizing: border-box; /* Ensures padding is included in width */
+            box-sizing: border-box;
         }
         #export-btn { background-color: #5cb85c; color: white; }
         #import-btn-label {
@@ -153,15 +153,22 @@
         <div class="section">
             <h2>Recent Expenses</h2>
             <ul id="expense-list">
-                <!-- Expenses will be added here -->
             </ul>
         </div>
     </div>
 
-    <!-- 3. All the app's logic goes here -->
     <script>
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+              console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            }, err => {
+              console.log('ServiceWorker registration failed: ', err);
+            });
+          });
+        }
+        
         document.addEventListener("DOMContentLoaded", () => {
-            // DOM Elements
             const form = document.getElementById('expense-form');
             const dateInput = document.getElementById('expense-date');
             const categoryInput = document.getElementById('expense-category');
@@ -176,11 +183,9 @@
 
             dateInput.valueAsDate = new Date();
 
-            // --- Data Storage (No more demo data) ---
             let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
             const saveExpenses = () => localStorage.setItem('expenses', JSON.stringify(expenses));
 
-            // --- Rendering ---
             const renderExpenses = () => {
                 expenseList.innerHTML = '';
                 if (expenses.length === 0) {
@@ -201,13 +206,12 @@
                 });
             };
 
-            // --- Graphing ---
             let expenseChart;
             const renderGraph = (timeframe = 'weekly') => {
                 const now = new Date();
                 let labels = [];
                 let data = [];
-                let chartType = 'line'; // Default to line chart
+                let chartType = 'line'; 
 
                 if (timeframe === 'weekly') {
                     const dataByDate = {};
@@ -241,7 +245,7 @@
                         }
                     });
                 } else { // yearly
-                    chartType = 'bar'; // Bar chart is better for comparing months
+                    chartType = 'bar';
                     labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                     data = Array(12).fill(0);
                     const currentYear = now.getFullYear();
@@ -295,7 +299,6 @@
                 }
             };
 
-            // --- Event Handlers ---
             form.addEventListener('submit', e => {
                 e.preventDefault();
                 const newExpense = {
