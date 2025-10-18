@@ -1,6 +1,6 @@
-const CACHE_NAME = 'expense-tracker-v3'; // Increment version to trigger update
+const CACHE_NAME = 'expense-tracker-v4'; // Increment version to force update
 const urlsToCache = [
-  '/index.html',
+  './index.html', // Use relative paths
   'https://cdn.jsdelivr.net/npm/chart.js'
 ];
 
@@ -9,7 +9,7 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Opened cache and caching app shell');
+        console.log('Opened cache');
         return cache.addAll(urlsToCache);
       })
   );
@@ -31,19 +31,13 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch event: serve cached content when offline (cache-first strategy)
+// Fetch event: serve cached content when offline
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // Cache hit - return response from cache
-        if (response) {
-          return response;
-        }
-        // Not in cache - fetch from network
-        return fetch(event.request);
-      }
-    )
+        return response || fetch(event.request);
+      })
   );
 });
 
