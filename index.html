@@ -125,23 +125,25 @@
             const monthlyBtn = document.getElementById('monthly-graph-btn');
             const yearlyBtn = document.getElementById('yearly-graph-btn');
 
-            // --- THIS IS THE FIX ---
-            // Function to set the date to today
-            const setDateToToday = () => {
-                dateInput.valueAsDate = new Date();
-            };
+            // --- NEW DATE LOGIC ---
+            const todayString = new Date().toISOString().split('T')[0];
 
-            // Set the date when the app loads
-            setDateToToday();
-            
-            // Also set the date every time the app becomes visible
-            // This handles resuming the app from the background
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') {
-                    setDateToToday();
-                }
+            // 1. Prevent selecting dates before today
+            dateInput.min = todayString;
+
+            // 2. Load the last used date from storage, or default to today
+            const lastUsedDate = localStorage.getItem('lastUsedDate');
+            if (lastUsedDate && lastUsedDate >= todayString) {
+                dateInput.value = lastUsedDate;
+            } else {
+                dateInput.value = todayString;
+            }
+
+            // 3. Save the date whenever it's changed by the user
+            dateInput.addEventListener('input', () => {
+                localStorage.setItem('lastUsedDate', dateInput.value);
             });
-            // --- END OF FIX ---
+            // --- END OF NEW DATE LOGIC ---
 
             let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
             const saveExpenses = () => localStorage.setItem('expenses', JSON.stringify(expenses));
@@ -262,15 +264,20 @@
             form.addEventListener('submit', e => {
                 e.preventDefault();
                 const newExpense = {
-                    id: Date.now(), date: dateInput.value,
-                    category: categoryInput.value, description: descInput.value,
+                    id: Date.now(),
+                    date: dateInput.value,
+                    category: categoryInput.value,
+                    description: descInput.value,
                     amount: amountInput.value
                 };
                 expenses.push(newExpense);
                 saveExpenses();
                 renderAll();
-                form.reset();
-                setDateToToday(); // Reset date after submit
+                
+                // Clear the form fields but keep the persistent date
+                categoryInput.value = '';
+                descInput.value = '';
+                amountInput.value = '';
             });
 
             exportBtn.addEventListener('click', () => {
