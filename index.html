@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker</title>
+    
+    <!-- 1. Include the Chart.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- 2. CSS for a clean, mobile-first look -->
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 15px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #333;
+        }
+        #app-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        #expense-form { display: grid; gap: 15px; }
+        #expense-form label { font-weight: bold; font-size: 0.9em; color: #555; margin-bottom: -10px; }
+        #expense-form input, 
+        #expense-form select, 
+        #expense-form button {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+        #expense-form button {
+            background-color: #007aff;
+            color: white;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #expense-form button:hover { background-color: #0056b3; }
+        .section { margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
+        #graph-controls { display: flex; gap: 10px; margin-bottom: 15px; }
+        #graph-controls button {
+            flex: 1;
+            background-color: #e9e9eb;
+            color: #333;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        #graph-controls button.active {
+            background-color: #007aff;
+            color: white;
+        }
+        #graph-container { width: 100%; min-height: 250px; }
+        #expense-list { list-style: none; padding: 0; margin: 0; }
+        #expense-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background-color: #fcfcfc;
+            border-bottom: 1px solid #eee;
+        }
+        #expense-list li .item-details { font-size: 0.9em; color: #666; }
+        #expense-list li .item-category { font-weight: bold; }
+        #expense-list li .item-amount { font-weight: bold; font-size: 1.1em; color: #d9534f; }
+        
+        /* Final style fix for buttons */
+        #import-export-controls button, #import-btn-label {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: none;
+            margin-bottom: 10px;
+            box-sizing: border-box; /* Ensures padding is included in width */
+        }
+        #export-btn { background-color: #5cb85c; color: white; }
+        #import-btn-label {
+            display: block;
+            background-color: #f0ad4e;
+            color: white;
+            text-align: center;
+        }
+        #import-file { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <h1>Expense Tracker</h1>
+
+        <form id="expense-form">
+            <label for="expense-date">Date:</label>
+            <input type="date" id="expense-date" required>
+
+            <label for="expense-category">Category:</label>
+            <select id="expense-category" required>
+                <option value="">Select a category...</option>
+                <option value="Food">Food</option>
+                <option value="Transport">Transport</option>
+                <option value="Bills">Bills</option>
+                <option value="Entertainment">Entertainment</option>
+                <option value="Other">Other</option>
+            </select>
+
+            <label for="expense-desc">Description:</label>
+            <input type="text" id="expense-desc" placeholder="e.g., Coffee, Bus ticket...">
+
+            <label for="expense-amount">Amount (₹):</label>
+            <input type="number" id="expense-amount" step="0.01" min="0" placeholder="0.00" required>
+
+            <button type="submit">Add Expense</button>
+        </form>
+
+        <div class="section">
+            <h2>Graphs</h2>
+            <div id="graph-controls">
+                <button id="weekly-graph-btn" class="active">Weekly</button>
+                <button id="monthly-graph-btn">Monthly</button>
+                <button id="yearly-graph-btn">Yearly</button>
+            </div>
+            <div id="graph-container">
+                <canvas id="expense-chart"></canvas>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Data Management</h2>
+            <div id="import-export-controls">
+                <button id="export-btn">Export Data (CSV)</button>
+                <label for="import-file" id="import-btn-label">Import Data (CSV)</label>
+                <input type="file" id="import-file" accept=".csv">
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Recent Expenses</h2>
+            <ul id="expense-list">
+                <!-- Expenses will be added here -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- 3. All the app's logic goes here -->
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            // DOM Elements
+            const form = document.getElementById('expense-form');
+            const dateInput = document.getElementById('expense-date');
+            const categoryInput = document.getElementById('expense-category');
+            const descInput = document.getElementById('expense-desc');
+            const amountInput = document.getElementById('expense-amount');
+            const expenseList = document.getElementById('expense-list');
+            const exportBtn = document.getElementById('export-btn');
+            const importFile = document.getElementById('import-file');
+            const weeklyBtn = document.getElementById('weekly-graph-btn');
+            const monthlyBtn = document.getElementById('monthly-graph-btn');
+            const yearlyBtn = document.getElementById('yearly-graph-btn');
+
+            dateInput.valueAsDate = new Date();
+
+            // --- Data Storage (No more demo data) ---
+            let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+            const saveExpenses = () => localStorage.setItem('expenses', JSON.stringify(expenses));
+
+            // --- Rendering ---
+            const renderExpenses = () => {
+                expenseList.innerHTML = '';
+                if (expenses.length === 0) {
+                    expenseList.innerHTML = '<li>No expenses yet. Add one above!</li>';
+                    return;
+                }
+                const recentExpenses = [...expenses].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 50);
+                recentExpenses.forEach(expense => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <div>
+                            <div class="item-category">${expense.category}</div>
+                            <div class="item-details">${expense.description || '&nbsp;'}</div>
+                        </div>
+                        <div class="item-amount">-₹${parseFloat(expense.amount).toFixed(2)}</div>
+                    `;
+                    expenseList.appendChild(li);
+                });
+            };
+
+            // --- Graphing ---
+            let expenseChart;
+            const renderGraph = (timeframe = 'weekly') => {
+                const now = new Date();
+                let labels = [];
+                let data = [];
+                let chartType = 'line'; // Default to line chart
+
+                if (timeframe === 'weekly') {
+                    const dataByDate = {};
+                    const startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 6);
+                    for (let i = 0; i < 7; i++) {
+                        const day = new Date(startDate);
+                        day.setDate(startDate.getDate() + i);
+                        labels.push(day.toLocaleDateString('en-US', { weekday: 'short' }));
+                        dataByDate[day.toISOString().split('T')[0]] = 0;
+                    }
+                    expenses.forEach(e => {
+                        const expenseDate = new Date(e.date);
+                        if (expenseDate >= startDate) {
+                            const dateString = expenseDate.toISOString().split('T')[0];
+                            if (dataByDate.hasOwnProperty(dateString)) {
+                                dataByDate[dateString] += parseFloat(e.amount);
+                            }
+                        }
+                    });
+                    data = Object.values(dataByDate);
+                } else if (timeframe === 'monthly') {
+                    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                    data = Array(daysInMonth).fill(0);
+                    labels = Array.from({length: daysInMonth}, (_, i) => i + 1);
+                    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                    expenses.forEach(e => {
+                        const expenseDate = new Date(e.date);
+                        if (expenseDate >= firstDayOfMonth && expenseDate.getMonth() === now.getMonth()) {
+                            data[expenseDate.getDate() - 1] += parseFloat(e.amount);
+                        }
+                    });
+                } else { // yearly
+                    chartType = 'bar'; // Bar chart is better for comparing months
+                    labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    data = Array(12).fill(0);
+                    const currentYear = now.getFullYear();
+                    expenses.forEach(e => {
+                        const expenseDate = new Date(e.date);
+                        if (expenseDate.getFullYear() === currentYear) {
+                            data[expenseDate.getMonth()] += parseFloat(e.amount);
+                        }
+                    });
+                }
+
+                if (expenseChart) expenseChart.destroy();
+                
+                const graphContainer = document.getElementById('graph-container');
+                const canvas = document.getElementById('expense-chart');
+                
+                if (data.every(item => item === 0)) {
+                    canvas.style.display = 'none';
+                    if (!document.getElementById('no-data-msg')) {
+                        const p = document.createElement('p');
+                        p.textContent = 'No data for this period.';
+                        p.id = 'no-data-msg';
+                        p.style.textAlign = 'center';
+                        p.style.color = '#999';
+                        graphContainer.appendChild(p);
+                    }
+                } else {
+                    canvas.style.display = 'block';
+                    const noDataMsg = document.getElementById('no-data-msg');
+                    if(noDataMsg) noDataMsg.remove();
+
+                    expenseChart = new Chart(canvas.getContext('2d'), {
+                        type: chartType,
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Total Expenses', data: data,
+                                backgroundColor: chartType === 'line' ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.7)',
+                                borderColor: 'rgba(0, 122, 255, 1)',
+                                borderWidth: 2, tension: 0.3, fill: true,
+                                pointBackgroundColor: 'rgba(0, 122, 255, 1)',
+                                borderRadius: chartType === 'bar' ? 5 : 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { display: false } },
+                            scales: { y: { beginAtZero: true } }
+                        }
+                    });
+                }
+            };
+
+            // --- Event Handlers ---
+            form.addEventListener('submit', e => {
+                e.preventDefault();
+                const newExpense = {
+                    id: Date.now(), date: dateInput.value,
+                    category: categoryInput.value, description: descInput.value,
+                    amount: amountInput.value
+                };
+                expenses.push(newExpense);
+                saveExpenses();
+                renderAll();
+                form.reset();
+                dateInput.valueAsDate = new Date();
+            });
+
+            exportBtn.addEventListener('click', () => {
+                if (expenses.length === 0) { alert("No data to export!"); return; }
+                const headers = "ID,Date,Category,Description,Amount\n";
+                const csvContent = expenses.map(e => `${e.id},${e.date},${e.category},"${e.description || ''}",${e.amount}`).join("\n");
+                const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", "expenses.csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+
+            importFile.addEventListener('change', e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const text = event.target.result;
+                    const rows = text.split('\n').slice(1);
+                    let importedCount = 0;
+                    rows.forEach(row => {
+                        if (!row) return;
+                        const columns = row.split(',');
+                        if (columns.length >= 5) {
+                            const newExpense = {
+                                id: parseInt(columns[0]) || Date.now() + Math.random(),
+                                date: columns[1], category: columns[2],
+                                description: columns[3].replace(/"/g, ''),
+                                amount: parseFloat(columns[4])
+                            };
+                            if (!expenses.some(ex => ex.id === newExpense.id)) {
+                                expenses.push(newExpense);
+                                importedCount++;
+                            }
+                        }
+                    });
+                    saveExpenses();
+                    renderAll();
+                    alert(`Imported ${importedCount} new expenses!`);
+                };
+                reader.readAsText(file);
+                importFile.value = '';
+            });
+
+            const setActiveButton = (activeBtn) => {
+                [weeklyBtn, monthlyBtn, yearlyBtn].forEach(btn => btn.classList.remove('active'));
+                activeBtn.classList.add('active');
+            };
+
+            weeklyBtn.addEventListener('click', () => {
+                renderGraph('weekly');
+                setActiveButton(weeklyBtn);
+            });
+            monthlyBtn.addEventListener('click', () => {
+                renderGraph('monthly');
+                setActiveButton(monthlyBtn);
+            });
+            yearlyBtn.addEventListener('click', () => {
+                renderGraph('yearly');
+                setActiveButton(yearlyBtn);
+            });
+
+            const renderAll = () => {
+                renderExpenses();
+                let activeTimeframe = 'weekly';
+                if (monthlyBtn.classList.contains('active')) activeTimeframe = 'monthly';
+                if (yearlyBtn.classList.contains('active')) activeTimeframe = 'yearly';
+                renderGraph(activeTimeframe);
+            };
+
+            renderAll();
+        });
+    </script>
+
+</body>
+</html>
