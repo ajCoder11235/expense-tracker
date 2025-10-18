@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Expense Tracker</title>
     
-    <!-- FIX: Use a relative path to the manifest -->
     <link rel="manifest" href="./manifest.json">
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -113,7 +112,6 @@
           });
         }
         
-        // --- Main App Logic ---
         document.addEventListener("DOMContentLoaded", () => {
             const form = document.getElementById('expense-form');
             const dateInput = document.getElementById('expense-date');
@@ -127,7 +125,23 @@
             const monthlyBtn = document.getElementById('monthly-graph-btn');
             const yearlyBtn = document.getElementById('yearly-graph-btn');
 
-            dateInput.valueAsDate = new Date();
+            // --- THIS IS THE FIX ---
+            // Function to set the date to today
+            const setDateToToday = () => {
+                dateInput.valueAsDate = new Date();
+            };
+
+            // Set the date when the app loads
+            setDateToToday();
+            
+            // Also set the date every time the app becomes visible
+            // This handles resuming the app from the background
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    setDateToToday();
+                }
+            });
+            // --- END OF FIX ---
 
             let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
             const saveExpenses = () => localStorage.setItem('expenses', JSON.stringify(expenses));
@@ -256,13 +270,13 @@
                 saveExpenses();
                 renderAll();
                 form.reset();
-                dateInput.valueAsDate = new Date();
+                setDateToToday(); // Reset date after submit
             });
 
             exportBtn.addEventListener('click', () => {
                 if (expenses.length === 0) { alert("No data to export!"); return; }
                 const headers = "ID,Date,Category,Description,Amount\n";
-                const csvContent = expenses.map(e => `${e.id},${e.date},${e.category},"${e.description || ''}",${e.amount}`).join("\n");
+                const csvContent = expenses.map(e => `${e.id},${e.date},"${e.category}","${e.description || ''}",${e.amount}`).join("\n");
                 const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
                 const url = URL.createObjectURL(blob);
@@ -288,7 +302,7 @@
                         if (columns.length >= 5) {
                             const newExpense = {
                                 id: parseInt(columns[0]) || Date.now() + Math.random(),
-                                date: columns[1], category: columns[2],
+                                date: columns[1], category: columns[2].replace(/"/g, ''),
                                 description: columns[3].replace(/"/g, ''),
                                 amount: parseFloat(columns[4])
                             };
